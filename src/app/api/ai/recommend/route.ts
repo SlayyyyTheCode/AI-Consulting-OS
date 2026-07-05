@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { MODELS, structuredCall } from "@/lib/ai/client";
+import { MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { recommendationPrompt } from "@/lib/ai/prompts";
 import {
   recommendationSchema,
@@ -24,34 +24,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Run classification first" }, { status: 400 });
   }
 
+  try {
   const context = await buildEngagementContext(engagementId);
-  const raw = await structuredCall<Recommendation>({
-    model: MODELS.reasoning,
-    system: recommendationPrompt(),
-    userContent: `Generate recommendations for this engagement:\n\n${context}`,
-    toolName: "save_recommendations",
-    toolDescription: "Save methodology, use case, accelerator, team, and risk recommendations.",
-    inputSchema: recommendationJsonSchema,
-    maxTokens: 8192,
-  });
-  const result = recommendationSchema.parse(raw);
-
-  const [saved] = await db
-    .insert(recommendations)
-    .values({ engagementId, payload: result })
-    .returning();
-
-  // Seed risk register from recommended risks.
-  if (result.risks.length > 0) {
-    await db.insert(riskRegister).values(
-      result.risks.map((r) => ({
-        engagementId,
-        risk: r.risk,
-        category: r.category,
-        mitigation: r.mitigation,
-      }))
-    );
+    const raw = await structuredCall<Recommendation>({
+      model: MODELS.reasoning,
+      system: recommendationPrompt(),
+      userContent: `Generate recommendations for this engagement:\n\n${context}`,
+      toolName: "save_recommendations",
+      toolDescription: "Save methodology, use case, accelerator, team, and risk recommendations.",
+      inputSchema: recommendationJsonSchema,
+      maxTokens: 8192,
+    });
+    const result = recommendationSchema.parse(raw);
+  
+    const [saved] = await db
+      .insert(recommendations)
+      .values({ engagementId, payload: result })
+      .returning();
+  
+    // Seed risk register from recommended risks.
+    if (result.risks.length > 0) {
+      await db.insert(riskRegister).values(
+        result.risks.map((r) => ({
+          engagementId,
+          risk: r.risk,
+          category: r.category,
+          mitigation: r.mitigation,
+        }))
+      );
+    }
+  
+    return NextResponse.json({ recommendation: saved });
+  } catch (err) {
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });
   }
-
-  return NextResponse.json({ recommendation: saved });
 }

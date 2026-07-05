@@ -4,6 +4,15 @@ export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+/** Extract a readable message from Anthropic SDK / generic errors. */
+export function aiErrorMessage(err: unknown): string {
+  if (err instanceof Anthropic.APIError) {
+    return `Anthropic API error (${err.status}): ${err.message}`;
+  }
+  if (err instanceof Error) return err.message;
+  return "Unknown AI error";
+}
+
 export const MODELS = {
   reasoning: "claude-sonnet-5",
   fast: "claude-haiku-4-5-20251001",

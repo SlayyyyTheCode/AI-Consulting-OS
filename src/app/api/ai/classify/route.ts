@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { MODELS, structuredCall } from "@/lib/ai/client";
+import { MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { classificationPrompt } from "@/lib/ai/prompts";
 import {
   classificationSchema,
@@ -24,29 +24,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Complete discovery first" }, { status: 400 });
   }
 
+  try {
   const context = await buildEngagementContext(engagementId);
-  const raw = await structuredCall<Classification>({
-    model: MODELS.fast,
-    system: classificationPrompt(),
-    userContent: `Classify this engagement:\n\n${context}`,
-    toolName: "save_classification",
-    toolDescription: "Save the business problem classification and MECE issue tree.",
-    inputSchema: classificationJsonSchema,
-  });
-  const result = classificationSchema.parse(raw);
-
-  const [saved] = await db
-    .insert(classifications)
-    .values({
-      engagementId,
-      domain: result.domain,
-      subDomain: result.subDomain,
-      businessFunction: result.businessFunction,
-      painPoints: result.painPoints,
-      opportunityAreas: result.opportunityAreas,
-      issueTree: result.issueTree,
-    })
-    .returning();
-
-  return NextResponse.json({ classification: saved });
+    const raw = await structuredCall<Classification>({
+      model: MODELS.fast,
+      system: classificationPrompt(),
+      userContent: `Classify this engagement:\n\n${context}`,
+      toolName: "save_classification",
+      toolDescription: "Save the business problem classification and MECE issue tree.",
+      inputSchema: classificationJsonSchema,
+    });
+    const result = classificationSchema.parse(raw);
+  
+    const [saved] = await db
+      .insert(classifications)
+      .values({
+        engagementId,
+        domain: result.domain,
+        subDomain: result.subDomain,
+        businessFunction: result.businessFunction,
+        painPoints: result.painPoints,
+        opportunityAreas: result.opportunityAreas,
+        issueTree: result.issueTree,
+      })
+      .returning();
+  
+    return NextResponse.json({ classification: saved });
+  } catch (err) {
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });
+  }
 }

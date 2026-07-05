@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { anthropic, MODELS, structuredCall } from "@/lib/ai/client";
+import { anthropic, MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { DISCOVERY_SYSTEM_PROMPT, BRIEF_EXTRACTION_PROMPT } from "@/lib/ai/prompts";
 import { briefSchema, briefJsonSchema, type Brief } from "@/lib/ai/schemas";
 import { db } from "@/lib/db";
@@ -40,6 +40,7 @@ export async function POST(req: Request) {
       .map((m) => `${m.role === "user" ? "CLIENT/CONSULTANT" : "INTERVIEWER"}: ${m.content}`)
       .join("\n\n");
 
+    try {
     const raw = await structuredCall<Brief>({
       model: MODELS.reasoning,
       system: BRIEF_EXTRACTION_PROMPT,
@@ -56,6 +57,9 @@ export async function POST(req: Request) {
       .where(eq(discoverySessions.id, existing!.id));
 
     return NextResponse.json({ brief });
+    } catch (err) {
+      return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });
+    }
   }
 
   const messages = (body.messages ?? []) as ChatMessage[];
@@ -64,6 +68,13 @@ export async function POST(req: Request) {
   }
 
   const contextHeader = `Engagement: "${engagement.title}" for client "${engagement.clientName}" in the ${engagement.industry} industry.`;
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      { error: "ANTHROPIC_API_KEY is not configured on the server" },
+      { status: 503 }
+    );
+  }
 
   const stream = anthropic.messages.stream({
     model: MODELS.reasoning,

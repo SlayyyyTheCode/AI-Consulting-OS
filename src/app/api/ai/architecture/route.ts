@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { MODELS, structuredCall } from "@/lib/ai/client";
+import { MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { architecturePrompt } from "@/lib/ai/prompts";
 import {
   architectureSchema,
@@ -24,29 +24,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Run recommendations first" }, { status: 400 });
   }
 
+  try {
   const context = await buildEngagementContext(engagementId);
-  const raw = await structuredCall<Architecture>({
-    model: MODELS.reasoning,
-    system: architecturePrompt(),
-    userContent: `Design the solution architecture for this engagement:\n\n${context}`,
-    toolName: "save_architecture",
-    toolDescription: "Save the solution architecture with components, data flow, tech stack, and mermaid diagram.",
-    inputSchema: architectureJsonSchema,
-    maxTokens: 8192,
-  });
-  const result = architectureSchema.parse(raw);
-
-  const [saved] = await db
-    .insert(architectures)
-    .values({
-      engagementId,
-      summary: result.summary,
-      components: result.components,
-      dataFlow: result.dataFlow,
-      techStack: result.techStack,
-      mermaidDiagram: result.mermaidDiagram,
-    })
-    .returning();
-
-  return NextResponse.json({ architecture: saved });
+    const raw = await structuredCall<Architecture>({
+      model: MODELS.reasoning,
+      system: architecturePrompt(),
+      userContent: `Design the solution architecture for this engagement:\n\n${context}`,
+      toolName: "save_architecture",
+      toolDescription: "Save the solution architecture with components, data flow, tech stack, and mermaid diagram.",
+      inputSchema: architectureJsonSchema,
+      maxTokens: 8192,
+    });
+    const result = architectureSchema.parse(raw);
+  
+    const [saved] = await db
+      .insert(architectures)
+      .values({
+        engagementId,
+        summary: result.summary,
+        components: result.components,
+        dataFlow: result.dataFlow,
+        techStack: result.techStack,
+        mermaidDiagram: result.mermaidDiagram,
+      })
+      .returning();
+  
+    return NextResponse.json({ architecture: saved });
+  } catch (err) {
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });
+  }
 }

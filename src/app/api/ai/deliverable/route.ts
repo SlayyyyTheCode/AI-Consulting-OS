@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { anthropic, MODELS } from "@/lib/ai/client";
+import { anthropic, MODELS, aiErrorMessage } from "@/lib/ai/client";
 import { deliverablePrompt } from "@/lib/ai/prompts";
 import { DELIVERABLE_TEMPLATES } from "@/lib/knowledge/deliverable-templates";
 import { db } from "@/lib/db";
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
   if (!engagement) return NextResponse.json({ error: "Engagement not found" }, { status: 404 });
 
   const context = await buildEngagementContext(engagementId);
+  try {
   const response = await anthropic.messages.create({
     model: MODELS.reasoning,
     max_tokens: 8192,
@@ -50,4 +51,7 @@ export async function POST(req: Request) {
     .returning();
 
   return NextResponse.json({ deliverable: saved });
+  } catch (err) {
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });
+  }
 }
