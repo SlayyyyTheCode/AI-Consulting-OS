@@ -1,7 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// Lazy proxy: the SDK constructor throws when no API key is present, which
+// would crash every route at module load — including demo-mode requests that
+// never call the API. Instantiate on first real use instead.
+let _client: Anthropic | null = null;
+
+function getClient(): Anthropic {
+  if (!_client) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured on the server");
+    }
+    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _client;
+}
+
+export const anthropic = new Proxy({} as Anthropic, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getClient(), prop, receiver);
+  },
 });
 
 /** Extract a readable message from Anthropic SDK / generic errors. */
@@ -31,7 +48,7 @@ export async function structuredCall<T>(opts: {
   inputSchema: Anthropic.Tool.InputSchema;
   maxTokens?: number;
 }): Promise<T> {
-  const response = await anthropic.messages.create({
+  const response = await getClient().messages.create({
     model: opts.model,
     max_tokens: opts.maxTokens ?? 4096,
     system: opts.system,

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { recommendationPrompt } from "@/lib/ai/prompts";
+import { isDemoMode, demoRecommend } from "@/lib/ai/demo";
+import { getEngagement } from "@/lib/db/queries";
 import {
   recommendationSchema,
   recommendationJsonSchema,
@@ -26,7 +28,10 @@ export async function POST(req: Request) {
 
   try {
   const context = await buildEngagementContext(engagementId);
-    const raw = await structuredCall<Recommendation>({
+    const engagement = await getEngagement(engagementId);
+    const raw = isDemoMode()
+      ? demoRecommend(classification.domain, engagement?.industry ?? "")
+      : await structuredCall<Recommendation>({
       model: MODELS.reasoning,
       system: recommendationPrompt(),
       userContent: `Generate recommendations for this engagement:\n\n${context}`,

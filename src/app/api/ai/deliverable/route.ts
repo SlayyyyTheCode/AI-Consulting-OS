@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { anthropic, MODELS, aiErrorMessage } from "@/lib/ai/client";
+import { isDemoMode, demoDeliverable } from "@/lib/ai/demo";
 import { deliverablePrompt } from "@/lib/ai/prompts";
 import { DELIVERABLE_TEMPLATES } from "@/lib/knowledge/deliverable-templates";
 import { db } from "@/lib/db";
@@ -23,6 +24,18 @@ export async function POST(req: Request) {
 
   const context = await buildEngagementContext(engagementId);
   try {
+  if (isDemoMode()) {
+    const [saved] = await db
+      .insert(deliverables)
+      .values({
+        engagementId,
+        templateKey,
+        title: `${template.name} — ${engagement.clientName}`,
+        contentMd: demoDeliverable(templateKey, context),
+      })
+      .returning();
+    return NextResponse.json({ deliverable: saved });
+  }
   const response = await anthropic.messages.create({
     model: MODELS.reasoning,
     max_tokens: 8192,

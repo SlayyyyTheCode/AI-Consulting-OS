@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { classificationPrompt } from "@/lib/ai/prompts";
+import { isDemoMode, demoClassify } from "@/lib/ai/demo";
 import {
   classificationSchema,
   classificationJsonSchema,
@@ -26,7 +27,9 @@ export async function POST(req: Request) {
 
   try {
   const context = await buildEngagementContext(engagementId);
-    const raw = await structuredCall<Classification>({
+    const raw = isDemoMode()
+      ? demoClassify(context)
+      : await structuredCall<Classification>({
       model: MODELS.fast,
       system: classificationPrompt(),
       userContent: `Classify this engagement:\n\n${context}`,

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
 import { architecturePrompt } from "@/lib/ai/prompts";
+import { isDemoMode, demoArchitecture } from "@/lib/ai/demo";
+import type { Recommendation } from "@/lib/ai/schemas";
 import {
   architectureSchema,
   architectureJsonSchema,
@@ -26,7 +28,11 @@ export async function POST(req: Request) {
 
   try {
   const context = await buildEngagementContext(engagementId);
-    const raw = await structuredCall<Architecture>({
+    const raw = isDemoMode()
+      ? demoArchitecture(
+          ((recommendation.payload as Recommendation).useCases ?? []).map((u) => u.key)
+        )
+      : await structuredCall<Architecture>({
       model: MODELS.reasoning,
       system: architecturePrompt(),
       userContent: `Design the solution architecture for this engagement:\n\n${context}`,

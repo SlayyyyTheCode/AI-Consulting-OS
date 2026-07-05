@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { anthropic, MODELS, structuredCall, aiErrorMessage } from "@/lib/ai/client";
+import { isDemoMode, demoDiscoveryReply, demoBrief } from "@/lib/ai/demo";
 import { DISCOVERY_SYSTEM_PROMPT, BRIEF_EXTRACTION_PROMPT } from "@/lib/ai/prompts";
 import { briefSchema, briefJsonSchema, type Brief } from "@/lib/ai/schemas";
 import { db } from "@/lib/db";
@@ -41,6 +42,14 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     try {
+    if (isDemoMode()) {
+      const brief = briefSchema.parse(demoBrief(messages));
+      await db
+        .update(discoverySessions)
+        .set({ extractedBrief: brief, completedAt: new Date(), updatedAt: new Date() })
+        .where(eq(discoverySessions.id, existing!.id));
+      return NextResponse.json({ brief });
+    }
     const raw = await structuredCall<Brief>({
       model: MODELS.reasoning,
       system: BRIEF_EXTRACTION_PROMPT,
@@ -69,11 +78,19 @@ export async function POST(req: Request) {
 
   const contextHeader = `Engagement: "${engagement.title}" for client "${engagement.clientName}" in the ${engagement.industry} industry.`;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY is not configured on the server" },
-      { status: 503 }
-    );
+  if (isDemoMode()) {
+    // Scripted interviewer — no LLM required.
+    const reply = demoDiscoveryReply(messages);
+    const fullMessages = [...messages, { role: "assistant" as const, content: reply }];
+    if (existing) {
+      await db
+        .update(discoverySessions)
+        .set({ messages: fullMessages, updatedAt: new Date() })
+        .where(eq(discoverySessions.id, existing.id));
+    } else {
+      await db.insert(discoverySessions).values({ engagementId, messages: fullMessages });
+    }
+    return new Response(reply, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
 
   const stream = anthropic.messages.stream({

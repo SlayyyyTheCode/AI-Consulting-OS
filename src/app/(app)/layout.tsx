@@ -22,6 +22,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <NavLinks isAdmin={user.role === "admin"} />
         </nav>
         <div className="border-t border-border p-4">
+          {!process.env.ANTHROPIC_API_KEY && (
+            <p className="mb-2 rounded-md bg-warning-soft px-2.5 py-1.5 text-xs font-medium text-warning">
+              Demo mode — rule engine, no AI key
+            </p>
+          )}
           <div className="mb-2 min-w-0">
             <p className="truncate text-sm font-medium">{user.name}</p>
             <p className="truncate text-xs text-muted">
