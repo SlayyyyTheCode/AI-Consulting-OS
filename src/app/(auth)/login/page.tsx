@@ -35,8 +35,8 @@ function LoginForm() {
     <Card>
       <h1 className="mb-4 text-lg font-semibold">Sign in</h1>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field label="Email" htmlFor="email">
-          <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} />
+        <Field label="Email or user ID" htmlFor="email">
+          <input id="email" name="email" type="text" required autoComplete="username" className={inputClass} />
         </Field>
         <Field label="Password" htmlFor="password">
           <input id="password" name="password" type="password" required autoComplete="current-password" className={inputClass} />
