@@ -18,7 +18,8 @@ An AI-powered Consulting Operating System that transforms a business problem int
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Drizzle ORM · Neon (Vercel Postgres) · Auth.js v5 · Anthropic Claude API (Sonnet 5 + Haiku 4.5) · Mermaid
 
-## Setup
+<details>
+<summary><strong>Setup</strong> (click to expand)</summary>
 
 1. **Clone and install**
 
@@ -47,6 +48,8 @@ Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Drizzle ORM · Neon 
    ```
 
    The first registered user becomes **admin**.
+
+</details>
 
 ## Deploy (Vercel)
 
